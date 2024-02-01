@@ -12,11 +12,13 @@ Created on Fri Feb  5 15:40:27 2021
 """
 
 from vpython import *
-import numpy as np
-import math
-import matplotlib.pyplot as plt
+import time
+import sys
+start_time = time.time()
 
-# win = 500 # peut aider à définir la taille d'un autre objet visuel comme un histogramme proportionnellement à la taille du canevas.
+# Aide à définir la taille d'un autre objet visuel comme un histogramme
+# proportionnellement à la taille du canevas.
+# win = 500
 
 # Déclaration de variables influençant le temps d'exécution de la simulation
 Natoms = 200  # change this to have more or fewer atoms
@@ -30,14 +32,20 @@ T = 300 # around room temperature
 
 #### CANEVAS DE FOND ####
 L = 1 # container is a cube L on a side
-gray = color.gray(0.7) # color of edges of container and spheres below
-animation = canvas( width=750, height=500) # , align='left')
+#gray = vector(0.7, 0.7, 1.5)
+gray = color.gray(0.7) # color of edges of container
+blue = color.blue # color of spheres
+animation = canvas( width=750, height=500 , align='center')
 animation.range = L
-# animation.title = 'Cinétique des gaz parfaits'
-# s = """  Simulation de particules modélisées en sphères dures pour représenter leur trajectoire ballistique avec collisions. Une sphère est colorée et grossie seulement pour l’effet visuel permettant de suivre sa trajectoire plus facilement dans l'animation, sa cinétique est identique à toutes les autres particules.
-
-# """
-# animation.caption = s
+animation.title = 'Cinétique des gaz parfaits'
+s = """
+Simulation de particules modélisées en sphères dures pour
+représenter leur trajectoire ballistique avec collisions.
+Une sphère est colorée et grossie seulement pour l’effet visuel
+permettant de suivre sa trajectoire plus facilement dans l'animation,
+sa cinétique est identique à toutes les autres particules.
+"""
+animation.caption = s
 
 #### ARÊTES DE BOÎTE 2D ####
 d = L/2+Ratom
@@ -57,7 +65,7 @@ for i in range(Natoms):
     z = 0
     if i == 0:  # garde une sphère plus grosse et colorée parmis toutes les grises
         Atoms.append(simple_sphere(pos=vector(x,y,z), radius=0.03, color=color.magenta))
-    else: Atoms.append(simple_sphere(pos=vector(x,y,z), radius=Ratom, color=gray))
+    else: Atoms.append(simple_sphere(pos=vector(x,y,z), radius=Ratom, color=blue))
     apos.append(vec(x,y,z)) # liste de la position initiale de toutes les sphères
 #    theta = pi*random() # direction de coordonnées sphériques, superflue en 2D
     phi = 2*pi*random() # direction aléatoire pour la quantité de mouvement
@@ -84,7 +92,8 @@ def checkCollisions():
 ## ATTENTION : la boucle laisse aller l'animation aussi longtemps que souhaité, assurez-vous de savoir comment interrompre vous-même correctement (souvent `ctrl+c`, mais peut varier)
 ## ALTERNATIVE : vous pouvez bien sûr remplacer la boucle "while" par une boucle "for" avec un nombre d'itérations suffisant pour obtenir une bonne distribution statistique à l'équilibre
 
-while True:
+iterations = 500
+for iter in range(iterations):
     rate(300)  # limite la vitesse de calcul de la simulation pour que l'animation soit visible à l'oeil humain!
 
     #### DÉPLACE TOUTES LES SPHÈRES D'UN PAS SPATIAL deltax
@@ -147,3 +156,4 @@ while True:
         p[j] = pcomj+mass*Vcom
         apos[i] = posi+(p[i]/mass)*deltat # move forward deltat in time, ramenant au même temps où sont rendues les autres sphères dans l'itération
         apos[j] = posj+(p[j]/mass)*deltat
+print("--- %.3f seconds ---" % (time.time() - start_time))
