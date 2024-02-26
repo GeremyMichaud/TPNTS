@@ -48,7 +48,7 @@ def DrudeModelSimulator(iterations=1000, champ=0):
     Electrons = []
     p = []
     apos = []
-    pavg = sqrt(2 * mass_electron * 1.5 * k * T)
+    pavg = sqrt(3 * mass_electron * k * T)
 
     for i in range(N_electrons):
         x = L * random() - L / 2
@@ -123,14 +123,15 @@ def DrudeModelSimulator(iterations=1000, champ=0):
                 p[i].x = abs(p[i].x) if loc.x < 0 else -abs(p[i].x)
             if abs(loc.y) > L / 2:
                 p[i].y = abs(p[i].y) if loc.y < 0 else -abs(p[i].y)
-                p[i].y += q * champ * dt
+                #p[i].y += q * champ * dt
 
         hitlist = checkCollisions()
 
         pavg_list.append(pavg)
         posavg_list.append(posavg)
 
-        temperature = pavg**2 / (3 * k * mass_electron)
+        temperature = pavg**2 / (3 * k * mass_electron)  # Redefine new temperature with lost of momentum (inelatic)
+
         # Handle electron-core collisions
         for ij in hitlist:
             i = ij[1]
@@ -141,16 +142,14 @@ def DrudeModelSimulator(iterations=1000, champ=0):
             rrel = hat(posi - posj)
             vrel = vi
 
-            #dx = dot(posi-posj, vrel.hat)
-            #dy = cross(posi-posj, vrel.hat).mag
-            #alpha = asin(dy/(R_electron+R_core))
-            #d = (R_electron+R_core)*cos(alpha)-dx
             deltat = d / vrel.mag
 
             theta = 2 * pi * random()
             norm_p = mass_electron * maxwell.rvs(scale=sqrt(k * temperature / mass_electron))
             p[i] = norm_p * hat(rotate(rrel, angle=theta))
             apos[i] = posi + (posi - posj) * deltat
+
+    print("--- %.3f seconds ---" % (time.time() - start_time))
 
     return [pavg_list, posavg_list]
 
