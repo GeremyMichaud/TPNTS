@@ -8,153 +8,150 @@
 
 from vpython import *
 import numpy as np
-import math
-import matplotlib.pyplot as plt
+import time
 from scipy.stats import maxwell
 
-def Simulation(champ, iterations):
-    # Déclaration de variables influençant le temps d'exécution de la simulation
-    Natoms = 100  # change this to have more or fewer atoms
-    Ncoeur_coter = 8
-    dt = 1E-5  # pas d'incrémentation temporel
 
-    # Déclaration de variables physiques "Typical values"
-    mass = 4E-3/6E23  # helium mass
-    Ratom = 0.01  # wildly exaggerated size of an atom
-    Rcoeur = 0.03
-    k = 1.4E-23  # Boltzmann constant # TODO: changer pour une constante de Boltzmann en eV/K :)
-    T = 300  # around room temperature
-    q = 1.602e-19
+def DrudeModelSimulator(iterations=1000, champ=0):
+    # Simulation parameters
+    N_electrons = 200
+    N_cores = 64  # It is easier when you choose a squared number for the number of cores
+    dt = 1E-7  # Increase the time increment if you dare! Brace yourself for a spectacular display of fireworks.
+    electron2follow = 0
+
+    # Physical constants
+    mass_electron = 9E-31
+    R_electron = 0.01  # wildly exaggerated size of an atom
+    R_core = 0.025
+    k = 1.4E-23
+    T = 300
+    q = 1.602E-19
+
+    start_time = time.time()
 
     # CANEVAS DE FOND
-    L = 1  # container is a cube L on a side
-    gray = color.gray(0.7)  # color of edges of container and spheres below
-    animation = canvas(width=750, height=500)  # , align='left')
+    L = 1
+    animation = canvas(width=750, height=500, align='center')
     animation.range = L
+    animation.title = 'Simulation du modèle de Drude'
+    s = """
+    Simulation de particules modélisées en sphères pour représenter le modèle de Drude.
+    Les sphères représentent les électrons mobiles (gris) et les coeurs ioniques fixes (rouges).
+    """
+    animation.caption = s
+    d = L / 2 + max(R_core, R_electron)
+    cadre = curve(color=color.blue, radius=0.005)
+    cadre.append([vector(-d, -d, 0), vector(d, -d, 0), vector(d, d, 0),
+                vector(-d, d, 0), vector(-d, -d, 0)])
 
-    # ARÊTES DE BOÎTE 2D
-    d = L/2+Ratom
-    r = 0.005
-    cadre = curve(color=gray, radius=r)
-    cadre.append([vector(-d, -d, 0), vector(d, -d, 0), vector(d, d, 0), vector(-d, d, 0), vector(-d, -d, 0)])
+    # Initialize electrons
+    Electrons = []
+    p = []
+    apos = []
+    pavg = sqrt(2 * mass_electron * 1.5 * k * T)
 
-    # POSITION ET QUANTITÉ DE MOUVEMENT INITIALE DES SPHÈRES
-    Atoms = []  # Objet qui contiendra les sphères pour l'animation
-    Coeur = []  # Objet qui contiendra les
-    p = []  # quantité de mouvement des sphères
-    apos = []  # position des sphères
-    cpos = []  # position des coeurs
-    pavg = sqrt(2*mass*1.5*k*T)  # average kinetic energy p**2/(2mass) = (3/2)kT
-
-    # Création de coordonée pour les sphère fixes
-    for i in range(Ncoeur_coter):  # Nombre de ligne
-        for n in range(Ncoeur_coter):  # Nombre de ligne
-            x = i*L/(Ncoeur_coter-1)-L/2  # position d'un coeur en tenant compte de l'origine au centre de la boîte
-            y = n*L/(Ncoeur_coter-1)-L/2
-            z = 0
-            Coeur.append(simple_sphere(pos=vector(x, y, z), radius=Rcoeur, color=color.red))
-            cpos.append(vec(x, y, z))
-
-    for i in range(Natoms):
-        x = L*random()-L/2  # position aléatoire qui tient compte que l'origine est au centre de la boîte
-        y = L*random()-L/2
+    for i in range(N_electrons):
+        x = L * random() - L / 2
+        y = L * random() - L / 2
         z = 0
-        if i == 0:
-            Atoms.append(simple_sphere(pos=vector(x, y, z), radius=0.03, color=color.magenta))
+        if i == electron2follow:
+            Electrons.append(simple_sphere(pos=vector(x, y, z), radius=0.02, color=color.magenta))
         else:
-            Atoms.append(simple_sphere(pos=vector(x, y, z), radius=Ratom, color=gray))
+            Electrons.append(simple_sphere(pos=vector(x, y, z), radius=R_electron, color=color.gray(0.7)))
         apos.append(vec(x, y, z))
 
-        phi = 2*pi*random()  # direction aléatoire pour la quantité de mouvement
-        px = pavg*cos(phi)  # qte de mvt initiale selon l'équipartition
-        py = pavg*sin(phi)
+        phi = 2 * pi * random()
+        px = pavg * cos(phi)
+        py = pavg * sin(phi)
         pz = 0
-        p.append(vector(px, py, pz))  # liste de la quantité de mouvement initiale de toutes les sphères
+        p.append(vector(px, py, pz))
 
-    # FONCTION POUR IDENTIFIER LES COLLISIONS
+    # Initialize ion cores
+    Cores = []
+    cpos = []
+    ion_core_spacing = L / (sqrt(N_cores) - 1)
+
+    for i in range(int(sqrt(N_cores))):
+        for j in range(int(sqrt(N_cores))):
+            # Create a 2D grid of ion cores with periodic arrangement within the square
+            x = i * ion_core_spacing - L / 2
+            y = j * ion_core_spacing - L / 2
+            z = 0
+            Cores.append(simple_sphere(pos=vector(x, y, z), radius=R_core, color=color.red))
+            cpos.append(vec(x, y, z))
+
     def checkCollisions():
-        hitlist = []  # initialisation
-        r2 = Ratom + Rcoeur  # distance critique où les 2 sphères entre en contact à la limite de leur rayon
-        r2 *= r2
-        for i in range(Ncoeur_coter**2):
+        """Check for collisions.
+
+        Returns:
+            list: List of collisions
+        """
+        hitlist = []
+        r2 = (R_electron + R_core) ** 2
+
+        for i in range(len(cpos)):
             ci = cpos[i]
-            for j in range(Natoms):
+            for j in range(len(apos)):
                 aj = apos[j]
+                # Does not care for electron-electron collisions
                 dr = ci - aj
                 if mag2(dr) < r2:
                     hitlist.append([i, j])
+
         return hitlist
 
-    # BOUCLE PRINCIPALE POUR L'ÉVOLUTION TEMPORELLE DE PAS dt
-    it = 0
-    collision = 0
-    liste_p = []
-    liste_p_avg = []
-    liste_pos_avg = []
+    pavg_list = []
+    posavg_list = []
 
+    # Main simulation
     for i in range(iterations):
-        rate(100)  # limite la vitesse de calcul de la simulation pour que l'animation soit visible à l'oeil humain!
+        rate(300)
 
-        pavg = np.mean(np.array([nb_p.mag for nb_p in p]))  # remodifie la valeur du p average pour chaque itéreation
-        posavg = np.mean(np.array([pos.y for pos in apos]))
+        pavg = np.mean([nb_p.mag for nb_p in p])
+        posavg = np.mean([pos.y for pos in apos])
 
-        # DÉPLACE TOUTES LES SPHÈRES D'UN PAS SPATIAL deltax
-        vitesse = []  # vitesse instantanée de chaque sphère
-        deltax = []  # pas de position de chaque sphère correspondant à l'incrément de temps dt
-        for i in range(Natoms):
-            vitesse.append(p[i]/mass)
-            deltax.append(vitesse[i] * dt)
-            Atoms[i].pos = apos[i] = apos[i] + deltax[i]
+        # Move electrons
+        for i in range(N_electrons):
+            vitesse = p[i] / mass_electron
+            deltax = vitesse * dt
+            Electrons[i].pos = apos[i] = apos[i] + deltax
 
-        # CONSERVE LA QUANTITÉ DE MOUVEMENT AUX COLLISIONS AVEC LES MURS DE LA BOÎTE
-        for i in range(Natoms):
+        # Conserve momentum with wall collisions
+        for i in range(N_electrons):
             loc = apos[i]
-            if abs(loc.x) > L/2:
-                if loc.x < 0:
-                    p[i].x = abs(p[i].x)
-                else:
-                    p[i].x = -abs(p[i].x)
-            if abs(loc.y) > L/2:
-                if loc.y < 0:
-                    p[i].y = abs(p[i].y)
-                else:
-                    p[i].y = -abs(p[i].y)
+            if abs(loc.x) > L / 2:
+                p[i].x = abs(p[i].x) if loc.x < 0 else -abs(p[i].x)
+            if abs(loc.y) > L / 2:
+                p[i].y = abs(p[i].y) if loc.y < 0 else -abs(p[i].y)
                 p[i].y += q * champ * dt
 
-        # LET'S FIND THESE COLLISIONS!!!
         hitlist = checkCollisions()
 
-        liste_p_avg.append(pavg)
-        liste_pos_avg.append(posavg)
-        collision += len(hitlist)
+        pavg_list.append(pavg)
+        posavg_list.append(posavg)
 
-        temperature = pavg**2/(3*k*mass)
-        # CONSERVE LA QUANTITÉ DE MOUVEMENT AUX COLLISIONS ENTRE SPHÈRES
+        temperature = pavg**2 / (3 * k * mass_electron)
+        # Handle electron-core collisions
         for ij in hitlist:
             i = ij[1]
             j = ij[0]
             posi = apos[i]
             posj = cpos[j]
-            vi = p[i]/mass
-            rrel = hat(posi-posj)
+            vi = p[i] / mass_electron
+            rrel = hat(posi - posj)
             vrel = vi
 
-            dx = dot(posi-posj, vrel.hat)
-            dy = cross(posi-posj, vrel.hat).mag
-            alpha = asin(dy/(Ratom+Rcoeur))
-            d = (Ratom+Rcoeur)*cos(alpha)-dx
-            deltat = d/vrel.mag
+            #dx = dot(posi-posj, vrel.hat)
+            #dy = cross(posi-posj, vrel.hat).mag
+            #alpha = asin(dy/(R_electron+R_core))
+            #d = (R_electron+R_core)*cos(alpha)-dx
+            deltat = d / vrel.mag
 
-            # CHANGE L'INTERPÉNÉTRATION DES SPHÈRES PAR LA CINÉTIQUE DE COLLISION
-            angle = pi*(random()-1/2)
-            norm_p = mass*maxwell.rvs(scale=sqrt(k*temperature/mass))
-            p[i] = norm_p * hat(rotate(rrel, angle=angle))
-            apos[i] = posi+(posi-posj)*deltat
+            theta = 2 * pi * random()
+            norm_p = mass_electron * maxwell.rvs(scale=sqrt(k * temperature / mass_electron))
+            p[i] = norm_p * hat(rotate(rrel, angle=theta))
+            apos[i] = posi + (posi - posj) * deltat
 
-            liste_p.append(p[i].mag)
+    return [pavg_list, posavg_list]
 
-        it += 1
-
-    return [liste_p_avg, liste_pos_avg]
-
-Simulation(0, 700)
+DrudeModelSimulator()
