@@ -107,10 +107,10 @@ def DrudeModelSimulator(iterations=500, champ=0, dt=1E-7):
         rate(300)
 
         pavg = np.mean([nb_p.mag for nb_p in p])
-        #posavg = np.mean([pos.y for pos in apos])
 
         # Move electrons
         for i in range(N_electrons):
+            #p[i].x += q *  champ * dt
             vitesse = p[i] / mass_electron
             deltax = vitesse * dt
             Electrons[i].pos = apos[i] = apos[i] + deltax
@@ -122,14 +122,15 @@ def DrudeModelSimulator(iterations=500, champ=0, dt=1E-7):
                 p[i].x = abs(p[i].x) if loc.x < 0 else -abs(p[i].x)
             if abs(loc.y) > L / 2:
                 p[i].y = abs(p[i].y) if loc.y < 0 else -abs(p[i].y)
-                #p[i].y += q * champ * dt
 
         hitlist = checkCollisions()
 
-        pavg_list.append(pavg)
-        #posavg_list.append(posavg)
+        if not hitlist:
+            continue
 
-        temperature = pavg**2 / (3 * k * mass_electron)  # Redefine new temperature with lost of momentum (inelatic)
+        pavg_list.append(pavg)
+
+        temperature = pavg**2 / (3 * k * mass_electron)  # Redefine new temperature with lost of momentum (inelastic)
 
         # Handle electron-core collisions
         for ij in hitlist:
@@ -150,6 +151,11 @@ def DrudeModelSimulator(iterations=500, champ=0, dt=1E-7):
 
             if i == electron2follow:
                 pmag_electron.append(mag(p[i]))
+
+            for index, _ in enumerate(p):
+                if index != i:
+                    p[index].x += q * champ * dt
+
 
     print("--- %.3f seconds ---" % (time.time() - start_time))
 
