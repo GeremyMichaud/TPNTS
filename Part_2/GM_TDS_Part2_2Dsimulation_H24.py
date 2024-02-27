@@ -1,10 +1,8 @@
-# Created on Fri Feb 5 15:40:27 2021
-# GlowScript 3.0 VPython
+# Created on Tuesday Feb 26 2024
 
-# Hard-sphere gas.
+# DrudeModelSimulator
 
-# Bruce Sherwood
-# Claudine Allen
+# Gérémy Michaud
 
 from vpython import *
 import numpy as np
@@ -12,11 +10,12 @@ import time
 from scipy.stats import maxwell
 
 
-def DrudeModelSimulator(iterations=1000, champ=0):
+def DrudeModelSimulator(iterations=500, champ=0, dt=1E-7):
+    # Increase the time increment dt if you dare! Brace yourself for a spectacular display of fireworks.
+
     # Simulation parameters
     N_electrons = 200
     N_cores = 64  # It is easier when you choose a squared number for the number of cores
-    dt = 1E-7  # Increase the time increment if you dare! Brace yourself for a spectacular display of fireworks.
     electron2follow = 0
 
     # Physical constants
@@ -101,14 +100,14 @@ def DrudeModelSimulator(iterations=1000, champ=0):
         return hitlist
 
     pavg_list = []
-    posavg_list = []
+    pmag_electron = [mag(p[electron2follow])]
 
     # Main simulation
     for i in range(iterations):
         rate(300)
 
         pavg = np.mean([nb_p.mag for nb_p in p])
-        posavg = np.mean([pos.y for pos in apos])
+        #posavg = np.mean([pos.y for pos in apos])
 
         # Move electrons
         for i in range(N_electrons):
@@ -128,7 +127,7 @@ def DrudeModelSimulator(iterations=1000, champ=0):
         hitlist = checkCollisions()
 
         pavg_list.append(pavg)
-        posavg_list.append(posavg)
+        #posavg_list.append(posavg)
 
         temperature = pavg**2 / (3 * k * mass_electron)  # Redefine new temperature with lost of momentum (inelatic)
 
@@ -149,8 +148,11 @@ def DrudeModelSimulator(iterations=1000, champ=0):
             p[i] = norm_p * hat(rotate(rrel, angle=theta))
             apos[i] = posi + (posi - posj) * deltat
 
+            if i == electron2follow:
+                pmag_electron.append(mag(p[i]))
+
     print("--- %.3f seconds ---" % (time.time() - start_time))
 
-    return [pavg_list, posavg_list]
+    return [pavg_list, pmag_electron]
 
 DrudeModelSimulator()
