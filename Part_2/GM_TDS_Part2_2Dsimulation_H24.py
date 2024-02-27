@@ -118,7 +118,6 @@ def DrudeModelSimulator(iterations=500, champ=0, dt=1E-7):
 
         # Move electrons
         for i in range(N_electrons):
-            #p[i].x += q *  champ * dt
             vitesse = p[i] / mass_electron
             deltax = vitesse * dt
             Electrons[i].pos = apos[i] = apos[i] + deltax
@@ -138,7 +137,8 @@ def DrudeModelSimulator(iterations=500, champ=0, dt=1E-7):
 
         pavg_list.append(pavg)
 
-        temperature = pavg**2 / (3 * k * mass_electron)  # Redefine new temperature with lost of momentum (inelastic)
+        # Redefine new temperature with lost of momentum (inelastic)
+        temperature = pavg**2 / (3 * k * mass_electron)
 
         # Handle electron-core collisions
         for ij in hitlist:
