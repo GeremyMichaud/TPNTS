@@ -102,11 +102,19 @@ def DrudeModelSimulator(iterations=500, champ=0, dt=1E-7):
     pavg_list = []
     pmag_electron = [mag(p[electron2follow])]
 
+    posavg_para_list = []
+    posavg_perp_list = []
+
     # Main simulation
     for i in range(iterations):
         rate(300)
 
         pavg = np.mean([nb_p.mag for nb_p in p])
+        posavg_para = np.mean([pos.x for pos in apos])
+        posavg_perp = np.mean([pos.y for pos in apos])
+
+        posavg_para_list.append(posavg_para)
+        posavg_perp_list.append(posavg_perp)
 
         # Move electrons
         for i in range(N_electrons):
@@ -159,6 +167,6 @@ def DrudeModelSimulator(iterations=500, champ=0, dt=1E-7):
 
     print("--- %.3f seconds ---" % (time.time() - start_time))
 
-    return [pavg_list, pmag_electron]
+    return [pavg_list, pmag_electron, posavg_para_list, posavg_perp_list]
 
 DrudeModelSimulator()
